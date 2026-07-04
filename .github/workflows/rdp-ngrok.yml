@@ -1,0 +1,96 @@
+name: "⚡ Direct RDP — Ngrok Tunnel"
+
+on:
+  workflow_dispatch:
+    inputs:
+      NGROK_TOKEN:
+        description: "Paste your Ngrok Authtoken from dashboard.ngrok.com"
+        required: true
+      PIN:
+        description: "Windows User Password (at least 8 chars recommended)"
+        required: true
+        default: "MySecurePassword123"
+
+jobs:
+  rdp-ngrok:
+    runs-on: windows-latest
+    steps:
+      - name: "🛡️ 1. Enable Terminal Server (RDP)"
+        shell: pwsh
+        run: |
+          Write-Host "Enabling Remote Desktop Protocol (RDP)..."
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          
+          # Set Windows Audio service to Automatic and Start it
+          Set-Service -Name "Audiosrv" -StartupType Automatic
+          Set-Service -Name "AudioEndpointBuilder" -StartupType Automatic
+          Start-Service -Name "Audiosrv", "AudioEndpointBuilder" -ErrorAction SilentlyContinue
+
+      - name: "🔑 2. Configure Windows User Password"
+        shell: pwsh
+        run: |
+          $username = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split('\')[1]
+          $Password = ConvertTo-SecureString "${{ github.event.inputs.PIN }}" -AsPlainText -Force
+          Set-LocalUser -Name $username -Password $Password
+          Write-Host "Password updated for user: $username"
+
+      - name: "📥 3. Download and Run Ngrok Tunnel"
+        shell: pwsh
+        run: |
+          Write-Host "Downloading Ngrok..."
+          $url = "https://bin.equinox.io/c/b341edd2yjk/ngrok-v3-stable-windows-amd64.zip"
+          $zipPath = "$env:TEMP\ngrok.zip"
+          $extractPath = "$env:TEMP\ngrok"
+          
+          Invoke-WebRequest -Uri $url -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+          $ngrokPath = "$extractPath\ngrok.exe"
+
+          Write-Host "Configuring Ngrok Authtoken..."
+          & $ngrokPath config add-authtoken "${{ github.event.inputs.NGROK_TOKEN }}"
+
+          Write-Host "Starting Ngrok TCP tunnel on port 3389..."
+          Start-Process -FilePath $ngrokPath -ArgumentList "tcp 3389" -WindowStyle Hidden
+          
+          Write-Host "Waiting for public address to be generated..."
+          $publicUrl = $null
+          for ($i = 0; $i -lt 15; $i++) {
+              try {
+                  $tunnels = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels"
+                  $publicUrl = $tunnels.tunnels[0].public_url
+                  if ($publicUrl) { break }
+              } catch {}
+              Start-Sleep -Seconds 2
+          }
+
+          if (-not $publicUrl) {
+              Write-Error "Failed to generate Ngrok tunnel. Please check if your Token is valid!"
+              exit 1
+          }
+
+          # Clean the tcp:// prefix from ngrok URL
+          $cleanUrl = $publicUrl -replace 'tcp://', ''
+
+          Write-Host "==============================================="
+          Write-Host "🎉 RDP Connection Details:"
+          Write-Host "IP / Address : $cleanUrl"
+          Write-Host "Username     : $username"
+          Write-Host "Password     : ${{ github.event.inputs.PIN }}"
+          Write-Host "==============================================="
+          Write-Host "Instructions:"
+          Write-Host "1. Open Remote Desktop Connection (mstsc) on your local PC."
+          Write-Host "2. Enter the IP/Address shown above."
+          Write-Host "3. Enter the Username and Password."
+          Write-Host "==============================================="
+
+      - name: "🔁 4. Keep Alive Loop"
+        shell: pwsh
+        run: |
+          $timeout = New-TimeSpan -Hours 6
+          $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+          while ($stopwatch.Elapsed -lt $timeout) {
+              $remaining = $timeout - $stopwatch.Elapsed
+              Write-Host "Running... Time elapsed: $($stopwatch.Elapsed.ToString('hh\:mm\:ss')) (Remaining: $($remaining.ToString('hh\:mm\:ss')))"
+              Start-Sleep -Seconds 60
+          }
