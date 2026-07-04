@@ -12,24 +12,40 @@ jobs:
   rdp-bore:
     runs-on: windows-latest
     steps:
-      - name: "🛡️ 1. Enable Terminal Server (RDP)"
+      - name: "🛡️ 1. Enable Terminal Server (RDP) & Force Config"
         shell: pwsh
         run: |
           Write-Host "Enabling Remote Desktop Protocol (RDP)..."
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+          
+          Write-Host "Disabling Network Level Authentication (NLA) for Tunnel Compatibility..."
+          # خاموش کردن قفل NLA و تنظیم لایه امنیتی معمولی برای عبور از تانل
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 1 -Force
+
+          Write-Host "Configuring Firewall Profiles..."
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+
+          Write-Host "Starting and restarting RDP services (TermService) to apply changes..."
+          Set-Service -Name "TermService" -StartupType Automatic
+          Restart-Service -Name "TermService" -Force -ErrorAction SilentlyContinue
           
           # Set Windows Audio service to Automatic and Start it
           Set-Service -Name "Audiosrv" -StartupType Automatic
           Set-Service -Name "AudioEndpointBuilder" -StartupType Automatic
           Start-Service -Name "Audiosrv", "AudioEndpointBuilder" -ErrorAction SilentlyContinue
 
-      - name: "🔑 2. Configure Windows User Password"
+      - name: "🔑 2. Configure Windows User Password & Permissions"
         shell: pwsh
         run: |
           $username = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split('\')[1]
           $Password = ConvertTo-SecureString "${{ github.event.inputs.PIN }}" -AsPlainText -Force
           Set-LocalUser -Name $username -Password $Password
+          
+          # اضافه کردن صریح کاربر به گروه دسترسی‌های ریموت دسکتاپ
+          Write-Host "Adding $username to Remote Desktop Users group..."
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member $username -ErrorAction SilentlyContinue
           Write-Host "Password updated for user: $username"
 
       - name: "📥 3. Download & Run Bore TCP Tunnel"
@@ -43,7 +59,6 @@ jobs:
           if (Test-Path $errPath) { Remove-Item $errPath -Force }
 
           Write-Host "Downloading Bore TCP Tunnel Client..."
-          # دانلود نسخه ویندوزی پایدار و رسمی Bore از گیت‌هاب سازنده
           $url = "https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-x86_64-pc-windows-msvc.zip"
           $zipPath = "$env:TEMP\bore.zip"
           $extractPath = "$env:TEMP\bore"
@@ -53,7 +68,6 @@ jobs:
           $borePath = "$extractPath\bore.exe"
 
           Write-Host "Starting Bore TCP tunnel on port 3389..."
-          # اجرای تانل روی پورت ویندوز و هدایت لاگ‌ها به فایل موقت
           $session = Start-Process -FilePath $borePath -ArgumentList "local 3389 --to bore.pub" -NoNewWindow -PassThru -RedirectStandardOutput $logPath -RedirectStandardError $errPath
 
           Write-Host "Waiting for Bore to allocate a port..."
@@ -62,7 +76,6 @@ jobs:
               Start-Sleep -Seconds 2
               if (Test-Path $logPath) {
                   $content = Get-Content $logPath -Raw
-                  # پیدا کردن آدرس تخصیص یافته (مثلاً bore.pub:12345)
                   if ($content -match 'bore\.pub:\d+') {
                       $address = $Matches[0]
                       break
