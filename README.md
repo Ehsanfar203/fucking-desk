@@ -50,7 +50,7 @@
 
 ## English Documentation
 
-**EnigMano Pro** automates the deployment of free, high-performance cloud instances running Windows 10 or Ubuntu Linux on GitHub Actions runners, using **Google Chrome Remote Desktop** for lag-free graphical remote access.
+** Pro** automates the deployment of free, high-performance cloud instances running Windows 10 or Ubuntu Linux on GitHub Actions runners, using **Google Chrome Remote Desktop** for lag-free graphical remote access.
 
 ### 🌟 Key Features:
 * **High Bandwidth Network:** Leverage Microsoft's Gigabit cloud data center speeds.
