@@ -246,7 +246,8 @@ jobs:
         shell: pwsh
         run: |
           $username = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split('\')[1]
-          $Password = ConvertTo-SecureString "${{ github.event.inputs.PIN }}" -AsPlainText -Force
+          # استفاده از یک رمز عبور استاندارد و قوی برای پاس کردن قوانین امنیتی مایکروسافت
+          $Password = ConvertTo-SecureString "GithubRunner123!" -AsPlainText -Force
           Set-LocalUser -Name $username -Password $Password
 
       - name: "🌟 11. Connect & Start RDP (Windows)"
