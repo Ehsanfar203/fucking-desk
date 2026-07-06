@@ -93,25 +93,44 @@ jobs:
               Write-Host "⚠️ Audio setup failed: $($_.Exception.Message)"
           }
 
-      - name: "📦 4. Install IDM, WinRAR, VLC & qBittorrent (Before Login)"
+      - name: "📦 4. Install IDM, WinRAR, VLC & qBittorrent (Direct Setup)"
         shell: pwsh
         run: |
           try {
-              Write-Host "Installing Internet Download Manager (IDM)..."
-              choco install idm -y --no-progress
+              # ۱. نصب و فعال‌سازی خودکار IDM
+              Write-Host "Downloading and Installing IDM..."
+              $idmUrl = "https://www.internetdownloadmanager.com/idman642build25.exe"
+              $idmPath = "$env:TEMP\idm.exe"
+              Invoke-WebRequest -Uri $idmUrl -OutFile $idmPath
+              Start-Process -FilePath $idmPath -ArgumentList "/skipdlgs" -Wait
               
-              Write-Host "Activating IDM Silently..."
-              # فعال‌سازی دائمی و ایمن آی‌دی‌ام با اسکریپت IAS
-              irm https://raw.githubusercontent.com/lstprjct/IDM-Activation-Script/main/IAS.ps1 | iex -Arguments "/act", "/s"
+              Write-Host "Activating IDM Silently via IAS..."
+              $iasPath = "$env:TEMP\ias.ps1"
+              Invoke-WebRequest -Uri "https://raw.githubusercontent.com/lstprjct/IDM-Activation-Script/main/IAS.ps1" -OutFile $iasPath
+              & $iasPath /act /s
+
+              # ۲. نصب WinRAR
+              Write-Host "Downloading and Installing WinRAR..."
+              $winrarUrl = "https://www.rarlab.com/rar/winrar-x64-624.exe"
+              $winrarPath = "$env:TEMP\winrar.exe"
+              Invoke-WebRequest -Uri $winrarUrl -OutFile $winrarPath
+              Start-Process -FilePath $winrarPath -ArgumentList "/S" -Wait
+
+              # ۳. نصب VLC Media Player
+              Write-Host "Downloading and Installing VLC..."
+              $vlcUrl = "https://get.videolan.org/vlc/3.0.20/win64/vlc-3.0.20-win64.exe"
+              $vlcPath = "$env:TEMP\vlc.exe"
+              Invoke-WebRequest -Uri $vlcUrl -OutFile $vlcPath
+              Start-Process -FilePath $vlcPath -ArgumentList "/S" -Wait
+
+              # ۴. نصب qBittorrent
+              Write-Host "Downloading and Installing qBittorrent..."
+              $qbUrl = "https://github.com/qbittorrent/qBittorrent/releases/download/release-4.6.5/qbittorrent_4.6.5_x64_setup.exe"
+              $qbPath = "$env:TEMP\qbittorrent.exe"
+              Invoke-WebRequest -Uri $qbUrl -OutFile $qbPath
+              Start-Process -FilePath $qbPath -ArgumentList "/S" -Wait
               
-              Write-Host "Installing WinRAR..."
-              choco install winrar -y --no-progress
-
-              Write-Host "Installing VLC Media Player..."
-              choco install vlc -y --no-progress
-
-              Write-Host "Installing qBittorrent..."
-              choco install qbittorrent -y --no-progress
+              Write-Host "🎉 All applications installed successfully!"
           } catch {
               Write-Host "⚠️ Software pre-installation failed: $($_.Exception.Message)"
           }
@@ -163,7 +182,6 @@ jobs:
           if ($Url) {
               try {
                   Write-Host "Pre-downloading file from: $Url"
-                  # استفاده از دسکتاپ عمومی و مشترک
                   $desktopPath = "C:\Users\Public\Desktop"
                   
                   $fileName = [System.IO.Path]::GetFileName([System.Uri]$Url.AbsolutePath)
@@ -183,7 +201,6 @@ jobs:
       - name: "📂 8. Create EnigMano Cloud Downloader Tool on Public Desktop"
         shell: pwsh
         run: |
-          # ساخت اسکریپت روی دسکتاپ عمومی برای دیدن صددرصدی آن پس از اولین ورود
           $desktopPath = "C:\Users\Public\Desktop"
           $downloaderPath = [System.IO.Path]::Combine($desktopPath, "EnigMano_Downloader.bat")
           
