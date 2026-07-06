@@ -246,7 +246,6 @@ jobs:
         shell: pwsh
         run: |
           $username = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split('\')[1]
-          # استفاده از یک رمز عبور استاندارد و قوی برای پاس کردن قوانین امنیتی مایکروسافت
           $Password = ConvertTo-SecureString "GithubRunner123!" -AsPlainText -Force
           Set-LocalUser -Name $username -Password $Password
 
@@ -293,7 +292,8 @@ jobs:
       - name: "📥 1. Install Desktop, PulseAudio & GCRD"
         run: |
           sudo apt-get update
-          sudo apt-get install -y xfce4 xfce4-goodies xvfb DBus-x11 pulseaudio pavucontrol
+          # تغییر نام بسته DBus-x11 به dbus-x11 با حروف کوچک برای حل خطا
+          sudo apt-get install -y xfce4 xfce4-goodies xvfb dbus-x11 pulseaudio pavucontrol
           wget https://dl.google.com/linux/direct/chrome-remote-desktop_current_amd64.deb
           sudo dpkg -i chrome-remote-desktop_current_amd64.deb || sudo apt-get install -f -y
 
